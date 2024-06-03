@@ -7,6 +7,7 @@ import uuid
 import os
 from encryption_and_decryption import encrypt
 import json
+from datetime import datetime
 
 from aws_lambda_powertools import Tracer
 from aws_lambda_powertools import Logger
@@ -17,13 +18,19 @@ dynamodb = boto3.resource('dynamodb', config=config)
 
 # define create_user function
 @tracer.capture_method
-def create_user():
+def create_user(queryParameters):
 
     # generate a unique id
     user_id = str(uuid.uuid4())
     
     # generate a random secret
     guest_secret = str(uuid.uuid4())+"-"+str(uuid.uuid4())
+
+    # additional user information
+    device_model = queryParameters['device_model'] if 'device_model' in queryParameters else ""
+    platform = queryParameters['platform'] if 'platform' in queryParameters else ""
+    country = queryParameters['country'] if 'country' in queryParameters else ""
+    date = datetime.utcnow().strftime("%Y/%m/%d")
 
     # Check that user_id doesn't exist in DynamoDB table defined in environment variable USER_TABLE
     table = dynamodb.Table(os.environ['USER_TABLE'])
@@ -32,7 +39,11 @@ def create_user():
         table.put_item(
             Item={
                 'UserId': user_id,
-                'GuestSecret': guest_secret
+                'GuestSecret': guest_secret,
+                'Device': device_model,
+                'Platform': platform,
+                'Country': country,
+                'Date': date,
             },
             ConditionExpression='attribute_not_exists(UserId)'
         )
@@ -68,7 +79,7 @@ def check_user_exists(existing_user_id, guest_secret):
 # define a lambda function that returns a user_id
 @tracer.capture_lambda_handler
 def lambda_handler(event, context):
-
+    logger.info("Received event: ", event)
     # Check if the event has an existing user_id
     user_id = None
     guest_secret = None
@@ -100,7 +111,7 @@ def lambda_handler(event, context):
         tries = 0
         while user_id is None and tries < 10:
             # Try to create a new user
-            user_id, guest_secret = create_user()
+            user_id, guest_secret = create_user(event['queryStringParameters'])
             tries += 1
 
     # At this point we either have a user_id we received from the event or we created a new one, or we failed at creating one

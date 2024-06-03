@@ -218,7 +218,7 @@ export class CustomIdentityComponentStack extends Stack {
         accessLogFormat: apigw.AccessLogFormat.clf(),
         loggingLevel : MethodLoggingLevel.ERROR,
         tracingEnabled: true,
-        stageName: 'prod',
+        //stageName: 'prod',
       }
     });
     // cdk-nag suppression for the API Gateway default logs access
